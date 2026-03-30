@@ -1,0 +1,169 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  password         String
+  name             String?
+  companyName      String    @map("company_name")
+  profileImageUrl  String?   @map("profile_image_url")
+  role             String    @default("company")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  templates        Template[]
+  apiKeys          ApiKey[]
+  validatedProofs  ValidatedProof[]
+  idempotencyResults IdempotencyResult[]
+
+  @@map("users")
+}
+
+model Bank {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  code        String   @unique // Código do banco (ex: "BAI", "BFA", "BIC")
+  country     String   @default("AO") // ISO country code
+  logoUrl     String?  @map("logo_url")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  templates       Template[]
+  validatedProofs ValidatedProof[]
+
+  @@index([code])
+  @@index([isActive])
+  @@map("banks")
+}
+
+model Template {
+  id                 String   @id @default(uuid())
+  name               String?  // Nome descritivo do template
+  type               String   // "express" or "iban" or "transferencia"
+  metadata           Json     @default("{}")
+  cloudinaryFileUrl  String   @map("cloudinary_file_url")
+  cloudinaryPublicId String   @map("cloudinary_public_id")
+  companyId          String   @map("company_id")
+  bankId             String   @map("bank_id")
+  isActive           Boolean  @default(true) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  company            User     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bank               Bank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  validatedProofs    ValidatedProof[]
+
+  @@index([companyId])
+  @@index([bankId])
+  @@index([isActive])
+  @@map("templates")
+}
+
+model ApiKey {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  name      String?  // Nome descritivo da chave
+  companyId String   @map("company_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  company      User          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  requestLogs  RequestLog[]
+
+  @@index([companyId])
+  @@index([key])
+  @@map("api_keys")
+}
+
+model RequestLog {
+  id          String   @id @default(uuid())
+  apiKeyId    String   @map("api_key_id")
+  endpoint    String   // Ex: "/api/v1/validate"
+  method      String   // Ex: "POST"
+  statusCode  Int      @map("status_code")
+  responseTime Int     @map("response_time") // em milissegundos
+  bankId      String?  @map("bank_id") // Banco usado na validação (se aplicável)
+  success     Boolean  @default(false)
+  errorMessage String? @map("error_message")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  apiKey      ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId])
+  @@index([createdAt])
+  @@index([bankId])
+  @@index([success])
+  @@map("request_logs")
+}
+
+model TokenBlacklist {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([token])
+  @@index([expiresAt])
+  @@map("token_blacklist")
+}
+
+model ValidatedProof {
+  id                String    @id @default(uuid())
+  sha256            String    @unique
+  phash             String
+  bankId            String    @map("bank_id")
+  companyId         String    @map("company_id")
+  matchedTemplateId String?   @map("matched_template_id")
+  isDuplicate       Boolean   @default(false) @map("is_duplicate")
+  valid             Boolean?
+  confidence        Float?
+  extractedData     Json?     @map("extracted_data")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  bank              Bank      @relation(fields: [bankId], references: [id])
+  company           User      @relation(fields: [companyId], references: [id])
+  matchedTemplate   Template? @relation(fields: [matchedTemplateId], references: [id])
+
+  @@index([sha256])
+  @@index([companyId])
+  @@index([bankId])
+  @@index([createdAt])
+  @@map("validated_proofs")
+}
+
+model IdempotencyResult {
+  id             String   @id @default(uuid())
+  idempotencyKey String   @unique @map("idempotency_key")
+  companyId      String   @map("company_id")
+  result         Json     // Armazenar o resultado completo da validação
+  createdAt      DateTime @default(now()) @map("created_at")
+  expiresAt      DateTime @map("expires_at") // Expirar após algum tempo
+
+  // Relations
+  company User @relation(fields: [companyId], references: [id])
+
+  @@index([idempotencyKey])
+  @@index([companyId])
+  @@index([expiresAt])
+  @@map("idempotency_results")
+}

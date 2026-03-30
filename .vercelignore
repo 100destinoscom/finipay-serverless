@@ -1,0 +1,17 @@
+node_modules
+.git
+.vscode
+.idea
+*.log
+.env
+.env.local
+.env.*.local
+*.md
+!README.md
+.eslintrc.json
+.prettierrc
+.gitignore
+tests
+coverage
+prisma/seed.ts
+src/server.ts
