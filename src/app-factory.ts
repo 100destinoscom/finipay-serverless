@@ -5,6 +5,7 @@ import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import compress from '@fastify/compress';
 import cookie from '@fastify/cookie';
+import { CORS_ALLOWED_HEADERS, CORS_METHODS, isOriginAllowed } from './config/cors';
 import { env } from './config/env';
 import { errorHandler } from './utils/errors';
 
@@ -28,8 +29,15 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Register plugins
   await app.register(cors, {
-    origin: true,
+    origin: (origin, callback) => {
+      callback(null, isOriginAllowed(origin));
+    },
     credentials: true,
+    methods: CORS_METHODS,
+    allowedHeaders: CORS_ALLOWED_HEADERS,
+    maxAge: 86400,
+    optionsSuccessStatus: 204,
+    preflightContinue: false,
   });
 
   await app.register(cookie, {

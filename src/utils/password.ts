@@ -16,6 +16,10 @@ export const comparePassword = async (
 };
 
 export const encryptPdf = (pdfBuffer: Buffer): string => {
+  if (!env.PYTHON_SERVICE_ENCRYPTION_KEY) {
+    throw new Error('PYTHON_SERVICE_ENCRYPTION_KEY is not configured');
+  }
+
   const secret = new fernet.Secret(env.PYTHON_SERVICE_ENCRYPTION_KEY);
   const token = new fernet.Token({ secret, ttl: 0 }); // No TTL for now
   return token.encode(pdfBuffer.toString('base64'));
